@@ -1,10 +1,15 @@
-# FastBismuth is a Python module to mine Bismuth quickly
+# QuickBismuth is a Python module to fastly mine the Bismuth
 
-The `miner.py` file is slow and is Python, even with Cython the overhead of the python runtime are significant in comparison to optimised C code.
+<img src="logo.png" align="left" height="100" />
 
-Included in this source package are two files:
+The `miner.py` script connects to pool servers and requests blocks to mine, proof of work is submitted and used to evenly distribute the rewards when blocks are mined.
 
- * fastmark.c - Implementation of Bismuth mining algorithm in C
- * fastminer.pyx - Python interface to native C code
+If Cython is available a native C module is compiled which boosts mining speed, this stub can be used to customise your miner dependant on your hardware.
 
-This module can be integrated into the `miner.py` file to speed up the Bismuth mining process.
+Included in the source package is:
+
+ * `miner.py` - Bismuth pool connection
+ * `fastminer.pyx` - Cython interface module
+ * `bismuth.c` - Fast Bismuth C miner
+ * `benchmark.py` - Verify and compare miner speeds
+ * `LICENSE` - source code distribution rights
