@@ -43,4 +43,5 @@ def bismuth(diff, address, db_block_hash, N=500000, seed=None):
     memcpy(found_nonce, <void*>seed_str, 32)
     if bismuth_miner(address, db_block_hash, diff_len, int(N), found_nonce):
         if verify(address, found_nonce, db_block_hash, diff_len):
+            # print("SUCCESS")
             return found_nonce

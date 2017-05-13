@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import sys
 import socket
+import math
 import logging as LOG
 from collections import namedtuple, defaultdict
 import fastminer
@@ -29,17 +30,16 @@ class MinerProtocol(object):
         # Send our version identifier
         try:
             self._send('version', fastminer.__version__)
-            if self._recv() != 'ok':
-                LOG.info("Peer %r - Protocol mismatch", self.peer)
-                return False
+            result = self._recv()
+            if result != 'ok':
+                raise RuntimeError("Protocol mismatch: %r" % (result,))
         except Exception as ex:
-            LOG.warning("Peer %r - Connect/Hello error: %r", self.peer, ex)
-            return False
+            raise RuntimeError("Connect/Hello error: %r" % (ex))
         LOG.info('Peer %r - Connected', self.peer)
         return True
 
     def _getwork(self):
-        return MinerJob(int(self._recv()), str(self._recv()), str(self._recv()))
+        return MinerJob(float(self._recv()), str(self._recv()), str(self._recv()))
 
     def fetch(self, job=None):
         if job is not None:
@@ -81,6 +81,8 @@ def main(args):
         print("Usage: miner.py <pool-dns-or-ip> [port] [bonus-hash]")
         return 1
 
+    LOG.basicConfig(level='INFO')
+
     # Connect to mining pool server
     pool_ip = args[0]
     port = int(args[1]) if len(args) > 1 else 5659
@@ -97,10 +99,12 @@ def main(args):
     result = None
     while True:
         job = miner.fetch(result)
+        LOG.info('Fetched job: %r', job)
 
         # Use C module to find a suitable block-key
         try:
-            block_key = fastminer.bismuth(job.diff, job.address, job.hash, os.urandom(32))
+            cyclecount = 500000
+            block_key = fastminer.bismuth(job.diff, job.address, job.hash, cyclecount, os.urandom(32))
         except KeyboardInterrupt:
             break
         if not block_key:
@@ -108,10 +112,11 @@ def main(args):
             continue
 
         # Good work, you mined something
-        histogram[job.diff] += 1
-        print(" [*] Submitted work: difficulty=%d address=%s nonce=%s")
         return_address = job.address if bonus_hash is None else bonus_hash
         result = MinerJob(job.diff, return_address, block_key)
+        LOG.info(" [*] Submitted work: difficulty=%d address=%s nonce=%s",
+                 result.diff, result.address, result.hash)
+        histogram[job.diff] += 1
     return 0
 
 

@@ -60,7 +60,7 @@ raw2hex( unsigned char *str, size_t len, char *out )
 
 
 static inline int
-byte_to_binary(char a, char *out)
+byte2bin(char a, char *out)
 {
 	// The python strips leading zeroes
     int z, m = 0, k = 0;
@@ -87,8 +87,8 @@ raw2hexbin( unsigned char *str, size_t len, char *out )
 	for( size_t N = 0; N < len; N++ )
 	{
 		unsigned char raw = str[N];
-		out += byte_to_binary(hex[ (raw >> 4) & 0xF ], out);
-		out += byte_to_binary(hex[ raw & 0xF ], out);
+		out += byte2bin(hex[ (raw >> 4) & 0xF ], out);
+		out += byte2bin(hex[ raw & 0xF ], out);
 	}
 	return out - begin;
 }
@@ -99,7 +99,7 @@ raw2bin( unsigned char *str, size_t len, char *out ) {
 	char *begin = out;
 	for( size_t N = 0; N < len; N++ )
 	{
-		out += byte_to_binary(str[N], out);
+		out += byte2bin(str[N], out);
 	}
 	return out - begin;
 }
@@ -111,7 +111,7 @@ raw2bin( unsigned char *str, size_t len, char *out ) {
 #define MINING_HASH_LEN (SHA224_DIGEST_HEXLENGTH + MD5_DIGEST_HEXLENGTH + SHA224_DIGEST_HEXLENGTH)
 
 
-int bismuth_miner( char *address_hex, char *db_block_hash_hex, int diff_len, int max_N, char *output_success )
+int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int diff_len, int max_N, char *output_success )
 {
 	MD5_CTX nonce_ctx;
 	unsigned char nonce_raw[MD5_DIGEST_LENGTH];
@@ -195,8 +195,8 @@ int bismuth_miner( char *address_hex, char *db_block_hash_hex, int diff_len, int
 int
 main( int argc, char **argv )
 {
-	char *address_hex;	
-	char *db_block_hash_hex;
+	const char *address_hex;	
+	const char *db_block_hash_hex;
 	int diff;
 
 	if( argc < 4 )
