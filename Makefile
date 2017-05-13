@@ -1,12 +1,15 @@
 CFLAGS=-O3 -flto -I/usr/local/opt/openssl/include/ -fomit-frame-pointer -L/usr/local/opt/openssl/lib
 
-all: fastbismuth.exe fastminer.so
+all: bismuth.exe fastminer.so
 
-fastbismuth.exe: fastmark.c
-	$(CC) -DFASTMARK_MAIN $(CFLAGS) -o $@ $< -lcrypto
+bismuth.exe: bismuth.c
+	$(CC) -DBISMUTH_MAIN $(CFLAGS) -o $@ $< -lcrypto
 
 fastminer.c: fastminer.pyx
 	cython fastminer.pyx
 
-fastminer.so: fastminer.c
-	$(CC) -pthread -shared $(CFLAGS) -o $@ $< `pkg-config python --cflags --libs` -lcrypto
+fastminer.so: fastminer.c bismuth.c
+	$(CC) -pthread -fPIC -shared $(CFLAGS) -o $@ $+ `pkg-config python --cflags --libs` -lcrypto
+
+clean:
+	rm -f fastminer.c *.so *.exe

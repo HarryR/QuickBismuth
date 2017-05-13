@@ -1,3 +1,4 @@
 fastminer.c
 *.exe
 *.so
+*.key
