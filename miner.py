@@ -3,7 +3,6 @@ from __future__ import print_function
 import os
 import sys
 import socket
-import math
 import logging as LOG
 from collections import namedtuple, defaultdict
 import fastminer
@@ -48,7 +47,7 @@ class MinerProtocol(object):
         return self._getwork()
 
     def exch(self, job):
-        if job is not None:
+        if job is None:
             return self.fetch()
         self._send('miner_exch', job.diff, job.address, job.hash)
         return self._getwork()
@@ -78,7 +77,7 @@ class MinerProtocol(object):
 
 def main(args):
     if not len(args):
-        print("Usage: miner.py <pool-dns-or-ip> [port] [bonus-hash]")
+        print("Usage: miner.py <pool-dns-or-ip> [port]")
         return 1
 
     LOG.basicConfig(level='INFO')
@@ -89,8 +88,6 @@ def main(args):
     sock = socket.create_connection((pool_ip, port), timeout=CONNECT_TIMEOUT)
     sock.settimeout(None)
 
-    bonus_hash = args[2] if len(args) > 2 else None
-
     # Setup protocol and statistics structs
     miner = MinerProtocol(sock)
     histogram = defaultdict(int)
@@ -98,25 +95,29 @@ def main(args):
     # Fetch jobs from server, and submit results in exchange for more work
     result = None
     while True:
-        job = miner.fetch(result)
+        try:
+            job = miner.fetch(result)
+        except Exception:
+            LOG.exception('Failed to fetch work')
+            break
         LOG.info('Fetched job: %r', job)
 
         # Use C module to find a suitable block-key
+        block_key = None
         try:
             cyclecount = 500000
             block_key = fastminer.bismuth(job.diff, job.address, job.hash, cyclecount, os.urandom(32))
         except KeyboardInterrupt:
             break
-        if not block_key:
+        if block_key is None:
             result = None
             continue
 
-        # Good work, you mined something
-        return_address = job.address if bonus_hash is None else bonus_hash
-        result = MinerJob(job.diff, return_address, block_key)
-        LOG.info(" [*] Submitted work: difficulty=%d address=%s nonce=%s",
+        difficulty = fastminer.difficulty(job.address, block_key, job.hash)
+        result = MinerJob(difficulty, job.hash, block_key)
+        LOG.info(" [*] Submitting: difficulty=%d block=%s nonce=%s",
                  result.diff, result.address, result.hash)
-        histogram[job.diff] += 1
+        histogram[difficulty] += 1
     return 0
 
 

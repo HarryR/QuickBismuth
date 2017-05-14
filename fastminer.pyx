@@ -16,6 +16,13 @@ cdef _bin_convert(string):
     return ''.join(format(ord(x), 'b') for x in string)
 
 
+def difficulty(address, nonce, db_block_hash):
+    needle = _bin_convert(db_block_hash)
+    input = address + nonce + db_block_hash
+    haystack = _bin_convert(hashlib.sha224(input).hexdigest())
+    return max([N for N in range(1, len(needle) - 1) if needle[:N] in haystack])
+
+
 def verify(address, nonce, db_block_hash, diff_len):
     mining_search_bin = _bin_convert(db_block_hash)[0:diff_len]
     mining_input = address + nonce + db_block_hash
