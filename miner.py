@@ -100,7 +100,7 @@ def main(args):
         except Exception:
             LOG.exception('Failed to fetch work')
             break
-        LOG.info('Fetched job: %r', job)
+        LOG.debug('Fetched job: %r', job)
 
         # Use C module to find a suitable block-key
         block_key = None
