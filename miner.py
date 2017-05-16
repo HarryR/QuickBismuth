@@ -89,8 +89,8 @@ def parse_args():
     parser.add_argument('--debug', action='store_const', dest="loglevel",
                         const=LOG.DEBUG, default=LOG.WARNING,
                         help="Log debugging messages")
-    parser.add_argument('pool', metavar="CONNECT", default='127.0.0.1:' + str(POOL_PORT),
-                        help="Pool server port")
+    parser.add_argument('pool', metavar="CONNECT", default='66.11.126.43:' + str(POOL_PORT),
+                        help="Pool server port", nargs='?')
     parser.add_argument('rewards', metavar='REWARDS', nargs='?', help='Mining rewards public-key address')
     opts = parser.parse_args()
     LOG.basicConfig(level=opts.loglevel, format="%(asctime)-15s %(levelname)-8s %(message)s")
