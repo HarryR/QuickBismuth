@@ -18,13 +18,15 @@ def main():
                 while True:
                     address = os.urandom(28).encode('hex')
                     block_hash = os.urandom(28).encode('hex')
-                    begin = time.time()
                     cyclecount = 100000
+
+                    cycles_begin = time.time()
                     nonce = fastminer.bismuth(diff, address, block_hash, cyclecount, address)
-                    end = time.time()
-                    totaltime += (end - begin)
+                    cycles_end = time.time()
+
+                    totaltime += (cycles_end - cycles_begin)
                     if nonce:
-                        foundlist.append(end - begin)
+                        foundlist.append(cycles_end - cycles_begin)
                         # print("D:%d Found in %.2f" % (diff, end - begin,))
                     else:
                         # print("D:%d Not found in %.2f" % (diff, end - begin,))

@@ -108,6 +108,10 @@ def main(args):
 
     # Fetch jobs from server, and submit results in exchange for more work
     sock = None
+    total_time = 0.0
+    total_cycles = 0
+    total_found = 0
+    last_update = 0
     while True:
         try:
             sock = socket.create_connection(peer[:2], timeout=CONNECT_TIMEOUT)
@@ -120,14 +124,30 @@ def main(args):
                 except Exception:
                     LOG.exception('[!] Failed to fetch work')
                     break
-                LOG.debug(' - Fetched job: %r', job)
+                LOG.debug(' -  Fetched job: %r', job)
 
                 # Use C module to find a suitable block-key
                 block_key = None
                 cyclecount = 500000
                 mine_args = (job.diff, job.address, job.hash, cyclecount, os.urandom(32))
+
+                cycles_begin = time.time()
                 cyclecount, block_key = fastminer.bismuth(*mine_args)
-                if block_key is None:
+                cycles_end = time.time()
+                # cycles_duration = cycles_end - cycles_begin
+
+                total_cycles += cyclecount
+                total_time += cycles_end - cycles_begin
+                success = block_key is not None
+                if success:
+                    total_found += 1
+
+                if last_update < (cycles_end - 10):
+                    LOG.info(' -  %.2f cycles/sec, %.2f avg submissions/min, difficulty %d',
+                             total_cycles / total_time, (total_found / total_time) * 60, job.diff)
+                    last_update = cycles_end
+
+                if not success:
                     result = None
                     continue
 
@@ -143,6 +163,9 @@ def main(args):
                 sock.close()
                 sock = None
             result = None
+        except Exception:
+            LOG.exception("While mining...")
+            break
         time.sleep(5)
 
     return 0

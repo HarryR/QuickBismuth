@@ -164,9 +164,10 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 	}
 
 	// Success route - output nonce for validation
-	if( found ) {
-		*output_cyclecount = count;
+	*output_cyclecount = count;
 
+	if( found )
+	{
 		raw2hex(nonce_raw, MD5_DIGEST_LENGTH, output_success);
 		output_success[MD5_DIGEST_HEXLENGTH] = 0;
 
