@@ -1,7 +1,8 @@
-import fastminer
+from __future__ import print_function
 import sys
 import os
 import time
+import fastminer
 
 
 def main():
@@ -32,9 +33,8 @@ def main():
                     if len(foundlist) > 50 or count > 100:
                         break
                 persec = (len(foundlist) / totaltime) if len(foundlist) else 0
-                output = "%d\t%.2f\t%.2f\t%s" % (
-                         diff, len(foundlist) / (count / 100.0),
-                         persec, fastminer.__version__)
+                output = "%d\t%.2f\t%.2f\t%s" % (diff, len(foundlist) / (count / 100.0),
+                                                 persec, fastminer.__version__)
                 print(output)
                 handle.write(output + "\n")
         except KeyboardInterrupt:

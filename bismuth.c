@@ -111,7 +111,7 @@ raw2bin( unsigned char *str, size_t len, char *out ) {
 #define MINING_HASH_LEN (SHA224_DIGEST_HEXLENGTH + MD5_DIGEST_HEXLENGTH + SHA224_DIGEST_HEXLENGTH)
 
 
-int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int diff_len, int max_N, char *output_success )
+int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int diff_len, int max_N, char *output_success, size_t *output_cyclecount )
 {
 	MD5_CTX nonce_ctx;
 	unsigned char nonce_raw[MD5_DIGEST_LENGTH];
@@ -122,7 +122,7 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 	unsigned char mining_hash_raw[SHA224_DIGEST_LENGTH];
 	unsigned char mining_hash_hexbin[(sizeof(mining_hash_raw) * 2 * 8) + 1];
 
-	int count = 0;
+	size_t count = 0;
 
 	char db_block_hash[SHA224_DIGEST_LENGTH+1];
 	hex2data(db_block_hash, db_block_hash_hex, SHA224_DIGEST_HEXLENGTH);
@@ -165,6 +165,8 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 
 	// Success route - output nonce for validation
 	if( found ) {
+		*output_cyclecount = count;
+
 		raw2hex(nonce_raw, MD5_DIGEST_LENGTH, output_success);
 		output_success[MD5_DIGEST_HEXLENGTH] = 0;
 
@@ -219,8 +221,9 @@ main( int argc, char **argv )
 
 	char found_nonce[MD5_DIGEST_HEXLENGTH+1];
 	memset(found_nonce, 0, sizeof(found_nonce));
-	if( bismuth_miner( address_hex, db_block_hash_hex, diff, 10000000, found_nonce) ) {
-		printf("%s\n", found_nonce);
+	size_t cyclecount = 0;
+	if( bismuth_miner( address_hex, db_block_hash_hex, diff, 10000000, found_nonce, &cyclecount) ) {
+		printf("%s %lu\n", found_nonce, cyclecount);
 	}
 	exit(1);
 }
