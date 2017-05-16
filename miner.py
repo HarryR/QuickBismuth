@@ -33,13 +33,10 @@ class MinerProtocol(object):
 
     def _on_connect(self):
         # Send our version identifier
-        try:
-            self._send('version', ' '.join([fastminer.__version__, self.rewards]))
-            result = self._recv()
-            if result != 'ok':
-                raise socket.error("Protocol mismatch: %r" % (result,))
-        except Exception as ex:
-            raise socket.error("Connect/Hello error: %r" % (ex))
+        self._send('version', fastminer.__version__, str(self.rewards))
+        result = self._recv()
+        if result != 'ok':
+            raise socket.error("Protocol mismatch: %r" % (result,))
         LOG.info('Peer %r - Connected', self._sockaddr)
         return True
 
@@ -140,8 +137,8 @@ def main(args):
                          result.diff, result.address, result.hash)
         except KeyboardInterrupt:
             break
-        except socket.error as ex:
-            LOG.warning('[!] Pool %r - socket: %r', peer, ex)
+        except socket.error:
+            LOG.exception('[!] Pool %r - socket', peer)
             if sock:
                 sock.close()
                 sock = None
