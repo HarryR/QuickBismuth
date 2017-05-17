@@ -50,7 +50,8 @@ release: $(RELEASE_ZIP)
 
 $(RELEASE_ZIP): bin/$(MINER_EXE) 
 	strip $<
-	cd bin && upx -9 $(MINER_EXE) zip ../$@ $(MINER_EXE)
+	upx -9 $<
+	cd bin && zip ../$@ $(MINER_EXE)
 
 clean:
 	rm -f bin/*
