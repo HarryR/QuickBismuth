@@ -1,6 +1,6 @@
-# -DUSE_SSE4_STRSTR
-# -DUSE_FAST_STRSTR
-# -DUSE_SCANSTR
+# -DUSE_SSE4_STRSTR <-- broken
+# -DUSE_FAST_STRSTR <-- slow
+# -DUSE_SCANSTR <-- faster :D
 
 OPTFLAGS?=-O3 -flto -fomit-frame-pointer -DUSE_SCANSTR
 
@@ -9,16 +9,15 @@ OPTFLAGS?=-O3 -flto -fomit-frame-pointer -DUSE_SCANSTR
 OS = $(shell uname -s)
 ARCH = $(shell uname -m)
 
+PKG_CONFIG?=pkg-config
+PACKAGES=python
 
-PACKAGES=python libcrypto
-
-
-CFLAGS?=-fPIC $(OPTFLAGS) `pkg-config $(PACKAGES) --cflags`
+CFLAGS?=-fPIC $(OPTFLAGS) `$(PKG_CONFIG) $(PACKAGES) --cflags`
 PYTHON?=python
 CYTHON?=cython
-PLATFORM=$(shell uname -s)-$(shell uname -p)
-RELEASE_ZIP=bin/release-$(PLATFORM).zip
-LDLIBS?=`pkg-config $(PACKAGES) --libs`
+PLATFORM=$(OS)-$(ARCH)
+RELEASE_ZIP=bin/QuickBismuth.$(PLATFORM).zip
+LDLIBS?=`$(PKG_CONFIG) $(PACKAGES) --libs`
 
 ifeq ($(OS),Linux)
 	LDLIBS += /usr/lib/x86_64-linux-gnu/libcrypto.a
@@ -46,7 +45,6 @@ bin/fastminer.c: fastminer.pyx
 
 bin/$(MINER_EXE): bismuth.c bin/fastminer.c
 	$(CC) -pthread $(CFLAGS) -o $@ $+ $(LDLIBS)
-
 
 release: $(RELEASE_ZIP)
 

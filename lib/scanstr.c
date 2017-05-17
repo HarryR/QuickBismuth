@@ -1,12 +1,4 @@
-#if defined(__FreeBSD__)
-#   include <sys/endian.h>
-#elif defined(__linux__)
-#   include <byteswap.h>
-#   define  bswap16 bswap_16
-#   define  bswap32 bswap_32
-#else
-#   error "Need a bswap intrinsic!"
-#endif
+#include "stdendian.h"
 
 #if BYTE_ORDER == BIG_ENDIAN
 #   define  MSBF16(x)   (*(uint16_t const*__attribute((aligned(1))))x)
