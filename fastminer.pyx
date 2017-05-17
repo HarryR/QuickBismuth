@@ -53,3 +53,8 @@ def bismuth(diff, address, db_block_hash, N=500000, seed=None):
         if verify(address, found_nonce, db_block_hash, diff_len):
             return cyclecount, found_nonce
     return cyclecount, None
+
+
+if __name__ == "__main__":
+    from miner import main
+    sys.exit(main(sys.argv[1:]))
