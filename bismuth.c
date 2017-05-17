@@ -148,20 +148,21 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 	raw2hex(db_block_hash, SHA224_DIGEST_LENGTH, &mining_input[SHA224_DIGEST_HEXLENGTH + MD5_DIGEST_HEXLENGTH]);
 	mining_input[MINING_HASH_LEN] = 0;
 
-	// Initialise shitty random
+	// Initialise the nonce with random data
 	MD5_Init(&nonce_ctx);
 	MD5_Update(&nonce_ctx, (const unsigned char *)output_success, 32);
 	MD5_Update(&nonce_ctx, (const unsigned char *)address_hex, strlen(address_hex));
 	MD5_Update(&nonce_ctx, (const unsigned char *)db_block_hash_hex, strlen(db_block_hash_hex));
+	MD5_Update(&nonce_ctx, nonce_raw, MD5_DIGEST_LENGTH);
+	MD5_Final(nonce_raw, &nonce_ctx);
+	raw2hex(nonce_raw, MD5_DIGEST_LENGTH, &mining_input[SHA224_DIGEST_HEXLENGTH]);
 
 	// Main loop
 	const char *found = NULL;
 	while( found == NULL && count++ < max_N )
 	{
 		// Cycle the NONCE, save into middle of mining_hash
-		MD5_Update(&nonce_ctx, nonce_raw, MD5_DIGEST_LENGTH);
-		MD5_Final(nonce_raw, &nonce_ctx);
-		raw2hex(nonce_raw, MD5_DIGEST_LENGTH, &mining_input[SHA224_DIGEST_HEXLENGTH]);
+		raw2hex(&count, sizeof(count), &mining_input[SHA224_DIGEST_HEXLENGTH]);
 
 		// Hash mining input buffer with SHA224
 		SHA224_Init(&mining_ctx);
@@ -188,7 +189,8 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 
 	if( found )
 	{
-		raw2hex(nonce_raw, MD5_DIGEST_LENGTH, output_success);
+		memcpy(output_success, &mining_input[SHA224_DIGEST_HEXLENGTH], MD5_DIGEST_HEXLENGTH);
+		//raw2hex(nonce_raw, MD5_DIGEST_LENGTH, output_success);
 		output_success[MD5_DIGEST_HEXLENGTH] = 0;
 
 		char mining_hash_hex[SHA224_DIGEST_HEXLENGTH+1];
@@ -203,7 +205,7 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 		printf("\tMining hash: %s\n", mining_hash_hex);
 		printf("\tHaystack: %s\n", mining_hash_hexbin);
 		printf("\tNeedle: %s\n", mining_search_hexbin);
-		printf("\tCount: %d\n", count);
+		printf("\tCount: %lu\n", count);
 		*/
 
 		return 1;

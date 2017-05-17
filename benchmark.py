@@ -21,7 +21,7 @@ def main():
                     cyclecount = 100000
 
                     cycles_begin = time.time()
-                    nonce = fastminer.bismuth(diff, address, block_hash, cyclecount, address)
+                    cyclecount, nonce = fastminer.bismuth(diff, address, block_hash, cyclecount, address)
                     cycles_end = time.time()
 
                     totaltime += (cycles_end - cycles_begin)
