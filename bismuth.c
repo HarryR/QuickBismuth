@@ -23,7 +23,7 @@
 #endif
 
 
-const char *bismuth_version () {
+const char *native_bismuth_version () {
 	return "morty." BISMUTH_MINER_ALGO;
 }
 
@@ -123,7 +123,7 @@ raw2bin( unsigned char *str, size_t len, char *out ) {
 #define MINING_HASH_LEN (SHA224_DIGEST_HEXLENGTH + MD5_DIGEST_HEXLENGTH + SHA224_DIGEST_HEXLENGTH)
 
 
-int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int diff_len, int max_N, char *output_success, size_t *output_cyclecount )
+int native_bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int diff_len, int max_N, char *output_success, size_t *output_cyclecount )
 {
 	MD5_CTX nonce_ctx;
 	unsigned char nonce_raw[MD5_DIGEST_LENGTH];
@@ -162,7 +162,7 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 	while( found == NULL && count++ < max_N )
 	{
 		// Cycle the NONCE, save into middle of mining_hash
-		raw2hex(&count, sizeof(count), &mining_input[SHA224_DIGEST_HEXLENGTH]);
+		raw2hex((void*)&count, sizeof(count), &mining_input[SHA224_DIGEST_HEXLENGTH]);
 
 		// Hash mining input buffer with SHA224
 		SHA224_Init(&mining_ctx);
@@ -227,7 +227,7 @@ main( int argc, char **argv )
 	if( argc < 4 )
 	{
 		fprintf(stderr, "Usage: %s <address> <db_block_hash> <diff>\n", basename(argv[0]));
-		fprintf(stderr, "Version: %s\n", bismuth_version());
+		fprintf(stderr, "Version: %s\n", native_bismuth_version());
 		exit(2);
 	}
 	address_hex = argv[1];
@@ -245,7 +245,7 @@ main( int argc, char **argv )
 	char found_nonce[MD5_DIGEST_HEXLENGTH+1];
 	memset(found_nonce, 0, sizeof(found_nonce));
 	size_t cyclecount = 0;
-	if( bismuth_miner( address_hex, db_block_hash_hex, diff, 10000000, found_nonce, &cyclecount) ) {
+	if( native_bismuth_miner( address_hex, db_block_hash_hex, diff, 10000000, found_nonce, &cyclecount) ) {
 		printf("%s %lu\n", found_nonce, cyclecount);
 	}
 	exit(1);

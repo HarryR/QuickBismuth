@@ -1,4 +1,6 @@
 *.key
 *.pyc
+*.swp
+*.swo
 /build/
 /dist/
