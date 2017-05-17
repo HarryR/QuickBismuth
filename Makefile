@@ -32,18 +32,18 @@ EXE_EXT = $(PLATFORM).exe
 
 MINER_EXE = QuickBismuth.Miner.$(EXE_EXT)
 
-all: bin/bismuth.exe bin/$(MINER_EXE)
+all: bin/test.exe bin/$(MINER_EXE)
 
 lint:
 	$(PYTHON) -mpylint -d missing-docstring -r n *.py
 
-bin/bismuth.exe: bismuth.c
+bin/test.exe: native_miner.c
 	$(CC) -DBISMUTH_MAIN $(CFLAGS) -o $@ $< -lcrypto
 
-bin/fastminer.c: fastminer.pyx
-	$(CYTHON) --embed -o $@ -D fastminer.pyx
+bin/quickbismuth.c: quickbismuth.pyx
+	$(CYTHON) --embed -o $@ -D quickbismuth.pyx
 
-bin/$(MINER_EXE): bismuth.c bin/fastminer.c
+bin/$(MINER_EXE): native_miner.c bin/quickbismuth.c
 	$(CC) -pthread $(CFLAGS) -o $@ $+ $(LDLIBS)
 
 release: $(RELEASE_ZIP)
