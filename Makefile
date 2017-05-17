@@ -1,4 +1,12 @@
-CFLAGS?=-O3 -flto -I/usr/local/opt/openssl/include/ -fomit-frame-pointer -L/usr/local/opt/openssl/lib
+# -DUSE_SSE4_STRSTR
+# -DUSE_FAST_STRSTR
+# -DUSE_SCANSTR
+
+OPTFLAGS?=-O3 -flto -fomit-frame-pointer -DUSE_SCANSTR
+
+#OPTFLAGS=-O0 -ggdb
+
+CFLAGS?=-fPIC $(OPTFLAGS) -I/usr/local/opt/openssl/include/ -L/usr/local/opt/openssl/lib
 PYTHON?=python
 CYTHON?=cython
 PLATFORM=$(shell uname -s).$(shell uname -p)
@@ -16,13 +24,13 @@ bin/fastminer.c: fastminer.pyx
 	$(CYTHON) -o $@ -D fastminer.pyx
 
 bin/fastminer.so: bin/fastminer.c bismuth.c
-	$(CC) -pthread -fPIC -shared $(CFLAGS) -o $@ $+ `pkg-config python --cflags --libs` -lcrypto
+	$(CC) -pthread -shared $(CFLAGS) -o $@ $+ `pkg-config python --cflags --libs` -lcrypto
 
 bin/miner.c:
 	$(CYTHON) -D --embed -o bin/miner.c fastminer.pyx
 
 bin/fastminer.exe: bismuth.c bin/miner.c
-	$(CC) -pthread -fPIC $(CFLAGS) -o $@ $+ `pkg-config python --cflags --libs` -lcrypto 
+	$(CC) -pthread $(CFLAGS) -o $@ $+ `pkg-config python --cflags --libs` -lcrypto 
 	strip -R .note -R .comment $@
 	upx -9 $@
 

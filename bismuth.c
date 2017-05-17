@@ -9,7 +9,19 @@
 #include <openssl/md5.h>
 #include <libgen.h>
 
-#define BISMUTH_MINER_ALGO "strstr.hexbin"
+#ifdef USE_SSE4_STRSTR
+# include "lib/sse4_strstr.c"
+# define BISMUTH_MINER_ALGO "strstr.sse4.hexbin"
+#elif defined(USE_FAST_STRSTR)
+# include "lib/fast_strstr.c"
+# define BISMUTH_MINER_ALGO "strstr.fast.hexbin"
+#elif defined(USE_SCANSTR)
+# include "lib/scanstr.c"
+# define BISMUTH_MINER_ALGO "scanstr.hexbin"
+#else
+# define BISMUTH_MINER_ALGO "strstr.hexbin"
+#endif
+
 
 const char *bismuth_version () {
 	return "morty." BISMUTH_MINER_ALGO;
@@ -143,7 +155,7 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 	MD5_Update(&nonce_ctx, (const unsigned char *)db_block_hash_hex, strlen(db_block_hash_hex));
 
 	// Main loop
-	char *found = NULL;
+	const char *found = NULL;
 	while( found == NULL && count++ < max_N )
 	{
 		// Cycle the NONCE, save into middle of mining_hash
@@ -160,7 +172,15 @@ int bismuth_miner( const char *address_hex, const char *db_block_hash_hex, int d
 		size_t mining_hash_hexbin_len = raw2hexbin(mining_hash_raw, sizeof(mining_hash_raw), mining_hash_hexbin);
 		mining_hash_hexbin[mining_hash_hexbin_len] = 0;
 
-		found = strstr( mining_hash_hexbin, mining_search_hexbin );	
+		#ifdef USE_SSE4_STRSTR
+		found = sse4_strstr( mining_search_hexbin, diff_len, mining_hash_hexbin, mining_hash_hexbin_len );
+		#elif defined(USE_FAST_STRSTR)
+		found = fast_strstr( mining_hash_hexbin, mining_search_hexbin );
+		#elif defined(USE_SCANSTR)
+		found = scanstr( mining_hash_hexbin, mining_search_hexbin, diff_len );	
+		#else
+		found = strstr( mining_hash_hexbin, mining_search_hexbin );
+		#endif
 	}
 
 	// Success route - output nonce for validation
