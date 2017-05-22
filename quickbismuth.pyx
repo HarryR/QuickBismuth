@@ -6,8 +6,14 @@ import socket
 import hashlib
 import sys
 import logging as LOG
+import threading
+from threading import Lock, Thread, Condition
 from collections import namedtuple
 from libc.string cimport memcpy
+
+
+def thread_id():
+    return threading.current_thread().name
 
 
 cdef extern:
@@ -18,10 +24,11 @@ __version__ = native_bismuth_version()
 
 
 CONNECT_TIMEOUT = 5
-POOL_PORT = 5659
+POOL_PORT = 5657
 
 
 MinerJob = namedtuple('MinerJob', ('diff', 'address', 'hash'))
+MinerThreadResult = namedtuple('MinerThreadResult', ('job', 'cyclecount', 'block_key'))
 
 
 class MinerProtocol(object):
@@ -44,14 +51,14 @@ class MinerProtocol(object):
         result = self._recv()
         if result != 'ok':
             raise socket.error("Protocol mismatch: %r" % (result,))
-        LOG.info('Peer %r - Connected', self._sockaddr)
+        LOG.info('[*] Peer %r - Connected', self._sockaddr)
         return True
 
     def _getwork(self):
-        try:
-            return MinerJob(float(self._recv()), str(self._recv()), str(self._recv()))
-        except Exception as ex:
-            raise socket.error(ex)
+        diff = self._recv()
+        if diff == 'wait':
+            return None
+        return MinerJob(float(diff), str(self._recv()), str(self._recv()))
 
     def fetch(self, job=None):
         if job is not None:
@@ -96,12 +103,94 @@ def parse_args():
     parser.add_argument('--debug', action='store_const', dest="loglevel",
                         const=LOG.DEBUG, default=LOG.WARNING,
                         help="Log debugging messages")
-    parser.add_argument('pool', metavar="CONNECT", default='66.11.126.43:' + str(POOL_PORT),
-                        help="Pool server port", nargs='?')
+    parser.add_argument('-t', '--threads', default=1, type=int, help="Number of mining threads")
+    parser.add_argument('-p', '--pool', metavar="CONNECT", default='66.11.126.43:' + str(POOL_PORT),
+                        help="Pool server port")
     parser.add_argument('rewards', metavar='REWARDS', nargs='?', help='Mining rewards public-key address')
     opts = parser.parse_args()
     LOG.basicConfig(level=opts.loglevel, format="%(asctime)-15s %(levelname)-8s %(message)s")
     return opts
+
+
+class MinerThreadPool(object):
+    __slots__ = ('_stop', 'nthreads', '_threads', '_lock', 'cond', 'results', 'job')
+    def __init__(self, nthreads):
+        self._stop = False
+        self.nthreads = nthreads
+        self._threads = list()
+        self._lock = Lock()
+        self.cond = Condition()
+        self.results = list()
+        self.job = None
+
+    def wait(self, timeout=5):
+        self.cond.acquire()
+        LOG.debug('Waiting for sync condition')
+        self.cond.wait(timeout)
+        self.cond.release()
+
+    def sync(self, new_job=None, timeout=5):
+        LOG.debug('Acquiring sync condition')
+        self.wait(timeout)
+
+        LOG.debug('Locking MinerThreadPool')
+        self.lock()
+        try:
+            old_job = self.job
+            if new_job:
+                self.job = new_job
+            results = self.results
+            self.results = list()
+        finally:
+            LOG.debug('Unlocking MinerThreadPool')
+            self.unlock()
+        return (old_job, results)
+
+    def lock(self):
+        LOG.debug('MinerThreadPool.lock begin - thread %r', thread_id())
+        result = self._lock.acquire()
+        LOG.debug('MinerThreadPool.lock success - thread %r', thread_id())
+        return result
+
+    def unlock(self):
+        return self._lock.release()
+
+    def _run(self):
+        while True:
+            self.lock()
+            if self._stop:
+                self.unlock()
+                break
+            job = self.job
+            if not job:
+                self.unlock()
+                time.sleep(1)
+                continue
+            self.unlock()
+
+            mine_args = (job.diff, job.address, job.hash, 500000, os.urandom(32))
+            cyclecount, block_key = bismuth_mine(*mine_args)
+            print("Finished", cyclecount)
+
+            self.lock()
+            try:
+                self.results.append((job, cyclecount, block_key))
+                self.cond.acquire()
+                self.cond.notify_all()
+                self.cond.release()
+            finally:
+                self.unlock()
+
+    def stop(self):
+        self._stop = True
+        for thr in self._threads:
+            print("joined", thr)
+            thr.join()
+
+    def start(self):
+        for N in range(0, self.nthreads):
+            thr = Thread(target=self._run, name='Miner-%d' % (N,))
+            thr.start()
 
 
 def main(args):
@@ -118,67 +207,65 @@ def main(args):
     total_time = 0.0
     total_cycles = 0
     total_found = 0
+    time_begin = time.time()
     last_update = 0
-    while True:
-        try:
-            sock = socket.create_connection(peer[:2], timeout=CONNECT_TIMEOUT)
-            sock.settimeout(None)
-            result = None
-            miner = MinerProtocol(sock, opts.rewards)
-            while True:
+    
+    sock = socket.create_connection(peer[:2], timeout=CONNECT_TIMEOUT)
+    sock.settimeout(None)
+    miner_proto = MinerProtocol(sock, opts.rewards)
+    miner_threads = MinerThreadPool(opts.threads)
+    miner_threads.start()
+
+    try:
+        job = None
+        while True:
+            LOG.debug('Starting loop')
+            # Periodically update user with statistics
+            now = time.time()
+            total_time = now - time_begin
+            if last_update < (now - 10):
+                if job:
+                    LOG.info(' -  %.2f cycles/sec, %.2f avg submissions/min, difficulty %r',
+                             total_cycles / total_time, (total_found / total_time) * 60, int(job.diff))
+                else:
+                    LOG.info(' -  Waiting for mining job...')
+                last_update = now
+
+            # Sync the thread pool status, retrieve results, update it with new job
+            need_fetch = job is None        
+            old_job, results_list = miner_threads.sync(job)
+
+            # Loop through results, submitting results and updating counters
+            for result_job, result_cycles, result_key in results_list:
+                total_cycles += result_cycles
+
+                result = None
+                if result_key:
+                    total_found += 1
+                    difficulty = bismuth_difficulty(result_job.address, result_key, result_job.hash)
+                    result = MinerJob(difficulty, result_job.hash, result_key)
+                    LOG.info("[*] Submitting: difficulty=%d block=%s nonce=%s",
+                             result.diff, result.address, result.hash)
                 try:
-                    job = miner.fetch(result)
+                    job = miner_proto.fetch(result)
                 except Exception:
                     LOG.exception('[!] Failed to fetch work')
                     break
-                LOG.debug(' -  Fetched job: %r', job)
+                need_fetch = False
 
-                # Use C module to find a suitable block-key
-                block_key = None
-                cyclecount = 500000
-                mine_args = (job.diff, job.address, job.hash, cyclecount, os.urandom(32))
+            # If there were no results from thread pool, or we need a new job, fetch a job
+            if need_fetch:
+                try:
+                    job = miner_proto.fetch()
+                    LOG.debug(' -  Fetched job: %r', job)
+                except Exception:
+                    LOG.exception('[!] Failed to fetch work')
+                    break
+    except KeyboardInterrupt:
+        LOG.warning("Ctrl+C caught, graceful seppuku in honor of keyboard gods")
 
-                cycles_begin = time.time()
-                cyclecount, block_key = bismuth_mine(*mine_args)
-                cycles_end = time.time()
-                # cycles_duration = cycles_end - cycles_begin
-
-                total_cycles += cyclecount
-                total_time += cycles_end - cycles_begin
-                success = block_key is not None
-                if success:
-                    total_found += 1
-
-                if last_update < (cycles_end - 10):
-                    LOG.info(' -  %.2f cycles/sec, %.2f avg submissions/min, difficulty %d',
-                             total_cycles / total_time, (total_found / total_time) * 60, job.diff)
-                    last_update = cycles_end
-
-                if not success:
-                    result = None
-                    continue
-
-                difficulty = bismuth_difficulty(job.address, block_key, job.hash)
-                result = MinerJob(difficulty, job.hash, block_key)
-                LOG.info("[*] Submitting: difficulty=%d block=%s nonce=%s",
-                         result.diff, result.address, result.hash)
-        except KeyboardInterrupt:
-            break
-        except socket.error:
-            LOG.exception('[!] Pool %r - socket', peer)
-            if sock:
-                sock.close()
-                sock = None
-            result = None
-        except Exception:
-            LOG.exception("While mining...")
-            break
-        time.sleep(5)
-
+    miner_threads.stop()
     return 0
-
-
-
 
 
 cdef _bin_convert(string):
